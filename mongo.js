@@ -19,10 +19,10 @@ const noteSchema = new mongoose.Schema({
 
 const Note = mongoose.model('Note', noteSchema)
 
-const note = new Note({
-    content: 'CSS is a pain in the ass',
-    important: false,
-})
+// const note = new Note({
+//     content: 'CSS is a pain in the ass',
+//     important: false,
+// })
 
 // note.save().then(result => {
 //     console.log('note saved!')
@@ -31,7 +31,7 @@ const note = new Note({
 
 Note.find({}).then(result => {
     result.forEach(n => {
-        console.log(note)
+        console.log(n)
     })
     mongoose.connection.close()
 })
