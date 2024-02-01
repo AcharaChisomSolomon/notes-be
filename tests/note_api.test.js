@@ -9,18 +9,26 @@ const User = require('../models/user')
 
 
 beforeEach(async () => {
-    await Note.deleteMany({})
+  await Note.deleteMany({})
+  await User.deleteMany({});
+
+  const passwordHash = await bcrypt.hash("sekret", 10);
+  const user = new User({ username: "root", passwordHash });
+
+  const newUser = await user.save();
 
     // const noteObjects = helper.initialNotes.map(n => new Note(n))
     // const promiseArray = noteObjects.map(n => n.save())
     // await Promise.all(promiseArray)
 
-    // for (let note of helper.initialNotes) {
-    //     let noteObject = new Note(note)
-    //     await noteObject.save()
-    // }
+  for (let note of helper.initialNotes) {
+    let noteObject = new Note({ ...note, user: newUser._id })
+    const savedNote = await noteObject.save()
+    newUser.notes = newUser.notes.concat(savedNote._id)
+    await newUser.save()
+  }
 
-    await Note.insertMany(helper.initialNotes)
+    
 })
 
 
@@ -51,13 +59,14 @@ describe('viewing a specific note', () => {
     test('succeeds with a valid id', async () => {
         const notesAtStart = await helper.notesInDB()
 
-        const noteToView = notesAtStart[0]
+      const noteToView = notesAtStart[0]
+      noteToView.user = noteToView.user.toString()
 
         const resultNote = await api
             .get(`/api/notes/${noteToView.id}`)
             .expect(200)
             .expect('Content-Type', /application\/json/)
-        
+      
         expect(resultNote.body).toEqual(noteToView)
     })
 
@@ -80,28 +89,36 @@ describe('viewing a specific note', () => {
 
 
 describe('addition of a new note', () => {
-    test("succeeds with valid data", async () => {
+  test("succeeds with valid data", async () => {
+    const allUsers = await User.find({})
+    const userToCreateNote = allUsers[0]
+
+    const newNote = {
+      content: "async/await simplifies making async calls",
+      important: true,
+      userId: userToCreateNote._id.toString()
+    };
+
+    await api
+      .post("/api/notes")
+      .send(newNote)
+      .expect(201)
+      .expect("Content-Type", /application\/json/);
+
+    const notesAtEnd = await helper.notesInDB();
+    expect(notesAtEnd).toHaveLength(helper.initialNotes.length + 1);
+
+    const contents = notesAtEnd.map((n) => n.content);
+    expect(contents).toContain("async/await simplifies making async calls");
+  });
+
+  test("fails with statuscode 400 if data is invalid", async () => {
+      const allUsers = await User.find({});
+      const userToCreateNote = allUsers[0];
+    
       const newNote = {
-        content: "async/await simplifies making async calls",
         important: true,
-      };
-
-      await api
-        .post("/api/notes")
-        .send(newNote)
-        .expect(201)
-        .expect("Content-Type", /application\/json/);
-
-      const notesAtEnd = await helper.notesInDB();
-      expect(notesAtEnd).toHaveLength(helper.initialNotes.length + 1);
-
-      const contents = notesAtEnd.map((n) => n.content);
-      expect(contents).toContain("async/await simplifies making async calls");
-    });
-
-    test("fails with statuscode 400 if data is invalid", async () => {
-      const newNote = {
-        important: true,
+        userId: userToCreateNote._id.toString()
       };
 
       await api.post("/api/notes").send(newNote).expect(400);
@@ -131,14 +148,14 @@ describe('deletion of a note', () => {
 
 
 describe('when there is initially one user in db', () => {
-  beforeEach(async () => {
-    await User.deleteMany({})
+  // beforeEach(async () => {
+  //   await User.deleteMany({})
 
-    const passwordHash = await bcrypt.hash('sekret', 10)
-    const user = new User({ username: 'root', passwordHash })
+  //   const passwordHash = await bcrypt.hash('sekret', 10)
+  //   const user = new User({ username: 'root', passwordHash })
 
-    await user.save()
-  })
+  //   await user.save()
+  // })
 
   test('creation succeeds with a fresh username', async () => {
     const usersAtStart = await helper.usersInDB()
